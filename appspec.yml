@@ -1,0 +1,18 @@
+version: 0.0
+os: linux
+files:
+  - source: image-uri.txt
+    destination: /opt/calculadora
+  - source: aws-region.txt
+    destination: /opt/calculadora
+  - source: scripts/
+    destination: /opt/calculadora/scripts
+hooks:
+  ApplicationStart:
+    - location: scripts/deploy.sh
+      timeout: 600
+      runas: root
+  ValidateService:
+    - location: scripts/validate-service.sh
+      timeout: 300
+      runas: root

@@ -66,3 +66,31 @@ Prometheus consulta la API cada 15 segundos. Grafana aprovisiona la fuente de da
 ```bash
 ./mvnw test
 ```
+
+## Despliegue manual en EC2 con Amazon ECR y CodeDeploy
+
+El workflow `Desplegar en EC2 con CodeDeploy` se ejecuta manualmente desde la rama `main` en GitHub Actions. Construye la imagen Docker, la publica en ECR con el SHA del commit como etiqueta, empaqueta `appspec.yml` y los scripts de despliegue, sube el bundle a S3 y espera el resultado de CodeDeploy. Si la nueva imagen no supera la comprobacion de salud, el script intenta restaurar la imagen anterior.
+
+### Configuracion de GitHub
+
+Configura estas variables del repositorio en **Settings > Secrets and variables > Actions > Variables**:
+
+| Variable | Valor |
+| --- | --- |
+| `AWS_ROLE_ARN` | ARN del rol IAM que GitHub asumira mediante OIDC |
+| `AWS_REGION` | Region AWS de ECR, S3 y CodeDeploy |
+| `ECR_REPOSITORY` | Nombre de un repositorio ECR existente |
+| `S3_BUCKET` | Bucket S3 existente para los bundles de CodeDeploy |
+| `CODEDEPLOY_APPLICATION` | Nombre de la aplicacion CodeDeploy para EC2/on-premises |
+| `CODEDEPLOY_DEPLOYMENT_GROUP` | Grupo de despliegue asociado a las instancias EC2 |
+
+Configura el proveedor OIDC `token.actions.githubusercontent.com` en AWS con audiencia `sts.amazonaws.com`. Restringe la relacion de confianza del rol a `repo:proyecto-terminal-k8s/calculadora-backend:ref:refs/heads/main`. El rol necesita `ecr:GetAuthorizationToken` sobre `*`; `ecr:DescribeRepositories`, `ecr:BatchCheckLayerAvailability`, `ecr:CompleteLayerUpload`, `ecr:InitiateLayerUpload`, `ecr:PutImage` y `ecr:UploadLayerPart` sobre el repositorio; `s3:PutObject` sobre el prefijo `releases/` del bucket; y `codedeploy:CreateDeployment`, `codedeploy:GetApplication`, `codedeploy:GetDeployment`, `codedeploy:GetDeploymentConfig` y `codedeploy:GetDeploymentGroup` para la aplicacion y el grupo de despliegue. El repositorio ECR y el bucket S3 deben existir antes de ejecutar el workflow, en la region configurada.
+
+### Preparacion de las instancias EC2
+
+- Registra las instancias en el grupo de despliegue y manten activo el agente CodeDeploy.
+- Instala Docker, AWS CLI y `curl` en las instancias, y habilita el servicio Docker al iniciar el sistema.
+- Asigna un perfil de instancia con `ecr:GetAuthorizationToken` sobre `*` y permisos `ecr:BatchCheckLayerAvailability`, `ecr:BatchGetImage` y `ecr:GetDownloadUrlForLayer` sobre el repositorio, ademas de `s3:GetObject` sobre el prefijo `releases/` del bucket para el agente CodeDeploy.
+- Permite el puerto TCP 8080 segun las necesidades de red de la aplicacion.
+
+El despliegue inicia un contenedor llamado `calculadora`, publica el puerto 8080 y valida `http://127.0.0.1:8080/actuator/health`. Reserva ese puerto en las instancias objetivo para esta aplicacion.

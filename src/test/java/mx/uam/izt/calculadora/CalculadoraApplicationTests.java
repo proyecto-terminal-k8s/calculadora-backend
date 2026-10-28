@@ -6,9 +6,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.hamcrest.Matchers.containsString;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -28,6 +29,23 @@ class CalculadoraApplicationTests {
 		mockMvc.perform(get("/health"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("UP"));
+	}
+
+	@Test
+	void registraCadaPeticionEnArchivo() throws Exception {
+		Path logFile = Path.of("logs/api-requests.txt");
+		long lineasAntes = Files.readString(logFile).lines().count();
+
+		mockMvc.perform(get("/health"))
+			.andExpect(status().isOk());
+
+		String log = Files.readString(logFile);
+		String ultimaEntrada = log.lines().reduce((first, second) -> second).orElseThrow();
+		org.junit.jupiter.api.Assertions.assertTrue(ultimaEntrada.contains("metodo=GET"));
+		org.junit.jupiter.api.Assertions.assertTrue(ultimaEntrada.contains("ruta=/health"));
+		org.junit.jupiter.api.Assertions.assertTrue(ultimaEntrada.contains("estado=200"));
+		org.junit.jupiter.api.Assertions.assertEquals(
+				lineasAntes + 1, Files.readString(logFile).lines().count());
 	}
 
 	@Test
@@ -75,13 +93,6 @@ class CalculadoraApplicationTests {
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.title").value("Operacion no valida"))
 			.andExpect(jsonPath("$.detail").value("No es posible dividir entre cero"));
-	}
-
-	@Test
-	void exponeMetricasDePrometheus() throws Exception {
-		mockMvc.perform(get("/actuator/prometheus"))
-			.andExpect(status().isOk())
-			.andExpect(content().string(containsString("# HELP")));
 	}
 
 	@Test

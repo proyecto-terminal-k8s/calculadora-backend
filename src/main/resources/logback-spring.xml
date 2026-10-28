@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<springProperty scope="context" name="requestLogFile" source="app.request-log.file"
+			defaultValue="logs/api-requests.txt"/>
+
+	<appender name="REQUEST_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${requestLogFile}</file>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>${requestLogFile}.%d{yyyy-MM-dd,UTC}</fileNamePattern>
+		</rollingPolicy>
+		<encoder>
+			<pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level %msg%n</pattern>
+		</encoder>
+	</appender>
+
+	<logger name="mx.uam.izt.calculadora.observability.RequestLoggingFilter"
+			level="INFO" additivity="false">
+		<appender-ref ref="REQUEST_FILE"/>
+	</logger>
+
+	<include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+	<include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+	<root level="INFO">
+		<appender-ref ref="CONSOLE"/>
+	</root>
+</configuration>

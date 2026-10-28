@@ -1,6 +1,6 @@
 # Calculadora API
 
-API REST de operaciones aritmeticas construida con Java 21 y Spring Boot. La aplicacion registra las peticiones en la salida estandar, expone metricas para Prometheus y proporciona una configuracion local de Grafana.
+API REST de operaciones aritmeticas construida con Java 21 y Spring Boot. La aplicacion guarda cada peticion HTTP en un archivo de texto persistente.
 
 ## Ejecutar localmente
 
@@ -30,13 +30,14 @@ Ejemplo de respuesta:
 
 La division usa precision decimal `DECIMAL128`. Dividir entre cero devuelve HTTP 400 con un error Problem Details. Los parametros faltantes o no numericos tambien son rechazados por Spring MVC con HTTP 400.
 
-## Logs y metricas
+## Logs
 
-Un filtro registra metodo, ruta, estado HTTP y duracion en milisegundos por peticion. Cada operacion tambien registra sus operandos y resultado. Los logs se escriben en consola (stdout/stderr), de modo que Docker y Kubernetes pueden recolectarlos sin que la aplicacion dependa de un backend de almacenamiento. La exportacion/retencion o envio a S3 queda para una practica posterior.
+Un filtro registra metodo, ruta, estado HTTP y duracion en milisegundos por peticion en `logs/api-requests.txt`. El archivo es de texto plano y se rota diariamente a `api-requests.txt.YYYY-MM-DD`; el archivo activo conserva la ruta configurada mediante `REQUEST_LOG_FILE`.
+
+En Kubernetes, monta un volumen persistente en el directorio que contiene el archivo y comparte ese volumen con el CronJob de respaldo. El CronJob envía a S3 el archivo rotado del día anterior y lo elimina solo después de confirmar que la carga terminó correctamente.
 
 - Salud: `GET /actuator/health`
 - Comprobacion sencilla para Kubernetes: `GET /health` (responde `{"status":"UP"}`)
-- Prometheus: `GET /actuator/prometheus`
 
 ## Documentacion OpenAPI
 
@@ -47,19 +48,16 @@ Springdoc genera la especificacion OpenAPI automaticamente a partir de los endpo
 
 La documentacion interactiva describe las cuatro operaciones, sus parametros decimales, el formato de respuesta y el endpoint de salud.
 
-## Prometheus y Grafana con Docker Compose
+## Ejecutar con Docker Compose
 
-Levanta la API y el stack de observabilidad (Docker compila el JAR en una etapa de build):
+Docker compila el JAR en una etapa de build y monta `./logs` para conservar los logs fuera del contenedor:
 
 ```bash
 docker compose up --build
 ```
 
 - API: <http://localhost:8080>
-- Prometheus: <http://localhost:9090>
-- Grafana: <http://localhost:3000> (usuario y contrasena iniciales: `admin` / `admin`)
-
-Prometheus consulta la API cada 15 segundos. Grafana aprovisiona la fuente de datos Prometheus y un dashboard con tasa de peticiones, latencia p95 y respuestas agrupadas por codigo HTTP. Los datos de Prometheus y Grafana se guardan en volumenes Docker.
+- Logs: `./logs/api-requests.txt`
 
 ## Pruebas
 
